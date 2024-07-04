@@ -148,25 +148,6 @@ export default function usePython(props?: UsePythonProps) {
     }
   }, [terminateOnCompletion, hasRun, isRunning])
 
-  const pythonRunnerCode = `
-import sys
-
-sys.tracebacklimit = 0
-
-def run(code, preamble=''):
-    globals_ = {}
-    try:
-        exec(preamble, globals_)
-        code = compile(code, 'code', 'exec')
-        exec(code, globals_)
-    except Exception:
-        type_, value, tracebac = sys.exc_info()
-        tracebac = tracebac.tb_next
-        raise value.with_traceback(tracebac)
-    finally:
-        print()
-`
-
   // prettier-ignore
   const moduleReloadCode = (modules: Set<string>) => `
 import importlib
@@ -180,7 +161,7 @@ del sys
 `
 
   const runPython = useCallback(
-    async (code: string, preamble = '') => {
+    async (code: string) => {
       // Clear stdout and stderr
       setStdout('')
       setStderr('')
@@ -191,10 +172,6 @@ del sys
         setPendingCode(code)
         return
       }
-
-      code = `${pythonRunnerCode}\n\nrun(${JSON.stringify(
-        code
-      )}, ${JSON.stringify(preamble)})`
 
       if (!isReady) {
         throw new Error('Pyodide is not loaded yet')
@@ -221,7 +198,7 @@ del sys
         await runnerRef.current.run(code)
         // eslint-disable-next-line
       } catch (error: any) {
-        setStderr('Traceback (most recent call last):\n' + error.message)
+        setStderr(error.message)
       } finally {
         setIsRunning(false)
         clearTimeout(timeoutTimer)
@@ -275,6 +252,8 @@ del sys
     unwatchModules,
     isAwaitingInput,
     sendInput: sendUserInput,
+    getFromGlobals: runnerRef.current?.getFromGlobals,
+    getVersion: runnerRef.current?.getVersion,
     prompt: runnerId ? getPrompt(runnerId) : ''
   }
 }
